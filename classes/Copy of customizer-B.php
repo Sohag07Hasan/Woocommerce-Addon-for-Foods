@@ -35,8 +35,7 @@ class WooShopCustomizerB{
 		//savign meta data while an order is created to trace it later
 		add_action('woocommerce_checkout_order_processed', array(get_class(), 'new_order_just_processed'), 10, 2);
 		
-		//categorize products like sale, sold out, deal on
-		
+		//categorize products like sale, sold out, deal on		
 		add_action('highlycustomized_before_shop_loop', array(get_class(), 'catgorize_products_for_pre_shop_page'), 100);
 		add_action('highlycustomized_categorize_products', array(get_class(), 'highlycustomized_categorize_products'));
 		
@@ -44,7 +43,9 @@ class WooShopCustomizerB{
 		add_action('woocommerce_before_single_product', array(get_class(), 'catgorize_products_for_pre_shop_page'));
 		add_action('highlycustomized_single_product_status', array(get_class(), 'highlycustomized_single_product_status'));
 				
-		//remove the add to cart button
+		//remove the add to cart button from preshop page
+		add_filter('preshop_woocommerce_loop_product_buy_able', array(get_class(), 'preshop_loop_product_buy_able'), 10, 2);
+		
 		add_filter('woocommerce_loop_product_buy_able', array(get_class(), 'loop_product_buy_able'), 10, 2);
 		
 		//single product
@@ -62,6 +63,10 @@ class WooShopCustomizerB{
 		
 		//oder details page
 		add_filter('brands_information', array(get_class(), 'brands_information_for_order_details'));
+		
+		
+		//preshop add to cart button
+		add_action('preshop_woocommerce_after_shop_loop_item', array(get_class(), 'preshop_woocommerce_after_shop_loop_item'));
 		
 	}
 	
@@ -147,7 +152,7 @@ class WooShopCustomizerB{
 		//saving date to the extra table
 		
 		$order = new WC_Order($order_id);
-		var_dump($order->get_order_total());
+		//var_dump($order->get_order_total());
 		$items = $order->get_items();
 		
 		$order_brands = array();
@@ -181,21 +186,24 @@ class WooShopCustomizerB{
 				foreach(self::$brand_details as $key => $brands){
 					if(in_array($b_id, $brands)){
 						self::$product_status['type'] = $key;
+						break;
 					}
 				}
 			}
 		}
-		else{
-			self::$product_status['type'] = 'deal_on';
-		}		
 		
-		if(!in_array(self::$product_status['type'], array('deal_on', 'unlock_it'))){
+		//var_dump(self::$brand_details);
+		//var_dump(self::$product_status);
+		
+		if(!in_array(self::$product_status['type'], array('unlock_it'))){
 			remove_all_actions('woocommerce_simple_add_to_cart');
 			remove_all_actions('woocommerce_grouped_add_to_cart');
 			remove_all_actions('woocommerce_variable_add_to_cart');
 			remove_all_actions('woocommerce_external_add_to_cart');
 		}
-			
+
+		
+		
 	}
 	
 	
@@ -224,6 +232,7 @@ class WooShopCustomizerB{
 		$condition_1 = false;
 		$condition_2 = true;
 		$condition_3 = true;
+		$auxiliary_1 = false;
 		
 		
 		$order_query_dtc = self::get_orders(array('date', 'time', 'code'));
@@ -296,21 +305,23 @@ class WooShopCustomizerB{
 		}
 		
 		/*
-		
+		var_dump($order_ids_dtc);
+		echo '<br/>';
 		var_dump($order_brands_dtc);
+		echo '<br/>';
 		var_dump($order_brands_dt);
+		echo '<br/>';
 		var_dump($delivery_codes);
+		echo '<br/>';
 		*/
-			
+		//var_dump($order_brands_dt);
+		
 		if(count($delivery_codes)){
 			arsort($delivery_codes);				
 			$codes = array_keys($delivery_codes);
 			$prices = array_values($delivery_codes);
 		}
-		
-		//var_dump($delivery_codes);
-		
-		
+				
 		if($order_brands_dt){
 			foreach($order_brands_dt as $b_id => $details){
 				$custom_fields = self::get_terms_custom_fields($b_id);
@@ -323,19 +334,24 @@ class WooShopCustomizerB{
 					if($order_brands_dtc[$b_id]['price'] >= $min_order){
 						$condition_1 = true;
 					}
-				}
+				} 
+				//var_dump($codes); echo "<br/>";
+				//var_dump($max_delivery_distance); echo "<br/>";
 				
-				if(count($codes) >= $max_delivery_distance){
+				if(count($codes) >= (int) $max_delivery_distance){
 					$codes = array_slice($codes, 0, $max_delivery_distance);
 					$prices = array_slice($prices, 0, $max_delivery_distance);
-				
+					
+					//var_dump($codes); echo "<br/>";
+					//var_dump($prices); echo "<br/>";
+					//var_dump($max_delivery_distance); echo "<br/>";
+					
+					
 					if($prices[$max_delivery_distance -1] >= $min_order){
 						if(in_array($_SESSION['delivery']['delivery_code'], $codes)){
 							$condition_1 = true;
-						}
-						else{
-							$condition_1 = false;
-						}
+							$auxiliary_1 = true;
+						}						
 					}							
 				}
 				
@@ -349,53 +365,55 @@ class WooShopCustomizerB{
 				
 				//condition2 now based on codes (latest update)
 				$used_codes = array_unique($details['codes']);
-				//var_dump($used_codes);
+				//var_dump($used_codes); echo "<br/>";
+				//var_dump($avg_delivery_speed);
+				//var_dump($max_delivery_crew);
 				
-				if(count($used_codes) < (30 / $avg_delivery_speed * $max_delivery_crew)){
-					$condition_2 = true;
+				if(count($used_codes) >= (30 / $avg_delivery_speed * $max_delivery_crew)){
+					if(!in_array($_SESSION['delivery']['delivery_code'], $used_codes)){
+						$condition_2 = false;
+					}					
 				}
 		
 				//condition 3				
 				$max_production_rate = $_SESSION['is_today'] ? $max_prod_rate_per_rush_hour : $max_prod_rate_per_non_rush_hour;
-				if($details['qty'] < $max_production_rate){
-					$condition_3 = true;
+				if($details['qty'] > $max_production_rate){
+					$condition_3 = false;
 				}
-	
-				/* formar logic
-				if($condition_1){
-					if($condition_2){
-						if($condition_3){
-							self::$brand_details['deal_on'][] =$b_id;
-						}
-						else{
-							self::$brand_details['sold_out'][] = $b_id;
-						}
-					}
-					else{
-						self::$brand_details['sold_out'][] = $b_id;
-					}
-				}
-				else{
-					self::$brand_details['unlock_it'][] =$b_id;
-				}
-				*/
+		
+				
+				//var_dump($condition_1); echo "<br/>";
+				//var_dump($condition_2); echo "<br/>";
+				//var_dump($condition_3); echo "<br/>";
+				//var_dump($auxiliary_1); echo "<br/>";
+				
 				
 				//latest lgoic
 				if($condition_1){
-					if($condition_2){
-						if($condition_3){
-							self::$brand_details['deal_on'][] = $b_id;
+					if($auxiliary_1){
+						self::$brand_details['deal_on'][] = $b_id;
+					}
+					else{
+						if($condition_2){
+							if($condition_3){
+								self::$brand_details['deal_on'][] = $b_id;							
+							}
+							else{
+								self::$brand_details['sold_out'][] = $b_id;							
+							}
 						}
 						else{
-							self::$brand_details['sold_out'][] = $b_id;
+							self::$brand_details['others'][] = $b_id;
 						}
+					}					
+				}
+				else{
+					if($condition_2){
+						self::$brand_details['unlock_it'][] = $b_id;
 					}
 					else{
 						self::$brand_details['others'][] = $b_id;
 					}
-				}
-				else{
-					self::$brand_details['unlock_it'][] = $b_id;
 				}
 				
 			}
@@ -417,6 +435,10 @@ class WooShopCustomizerB{
 	 * Categorize the products for pre shop page
 	 * */
 	static function highlycustomized_categorize_products($post){
+		
+		//var_dump($post);
+		$status = false;
+		
 		$brand_ids = wp_get_object_terms($post->ID, self::food_provider_taxonomy, array('fields'=>'ids'));
 		
 		if($brand_ids && self::$brand_details){
@@ -425,15 +447,18 @@ class WooShopCustomizerB{
 					if(in_array($b_id, $brands)){
 						self::$pre_shop_products[$key][] = $post;
 						self::$pre_shop_product_ids[$key][] = $post->ID;
+						$status = true;
 						break;
 					}
 				}
 			}
 		}
-		else{
+		
+		if(!$status){
 			self::$pre_shop_products['unlock_it'][] = $post;
 			self::$pre_shop_product_ids['unlock_it'][] = $post->ID;
 		}
+		
 	}
 	
 	
@@ -441,14 +466,25 @@ class WooShopCustomizerB{
 	 * Remove the add to cart button checking the conditionals
 	 * try to use show_appropriate_flash method first, if not found, it will make it's own query
 	 * */
-	static function loop_product_buy_able($status, $product){
-		
-		if(!$status) return $status;
-		
-		if(is_array(self::$pre_shop_product_ids['deal_on']) && in_array($product->id, self::$pre_shop_product_ids['deal_on'])) return true;
+	static function preshop_loop_product_buy_able($status, $product){
+		if(is_array(self::$pre_shop_product_ids['deal_on']) && in_array($product->id, self::$pre_shop_product_ids['deal_on'])) return false;
+		if(is_array(self::$pre_shop_product_ids['sold_out']) && in_array($product->id, self::$pre_shop_product_ids['sold_out'])) return false;
 		if(is_array(self::$pre_shop_product_ids['unlock_it']) && in_array($product->id, self::$pre_shop_product_ids['unlock_it'])) return true;
+		if(is_array(self::$pre_shop_product_ids['others']) && in_array($product->id, self::$pre_shop_product_ids['others'])) return false;
 		
-		return false;
+		return $status;
+	}
+	
+	
+	//shop page add to cart button remove button
+	static function loop_product_buy_able($status, $product){
+		if(isset($_REQUEST['shop_type'])){
+			if(in_array($_REQUEST['shop_type'], array('deal_on', 'others', 'sold_out'))){
+				$status = false;
+			}
+		}
+		
+		return $status;
 	}
 	
 	
@@ -489,21 +525,21 @@ class WooShopCustomizerB{
 					$order_args['meta_query'][] = array(
 						'key' => self::delivery_date,
 						'value' => $_SESSION['delivery']['delivery_time'],
-						'compare' => 'LIKE'
+						'compare' => '='
 					);
 					break;
 				case 'time':
 					$order_args['meta_query'][] = array(
 						'key' => self::delivery_hour,
 						'value' => $_SESSION['delivery']['delivery_time_h'],
-						'compare' => 'LIKE'
+						'compare' => '='
 					);
 					break;
 				case 'code':
 					$order_args['meta_query'][] = array(
 						'key' => self::delivery_code,
 						'value' => $_SESSION['delivery']['delivery_code'],
-						'compare' => 'LIKE'
+						'compare' => '='
 					);
 			}
 		}	
@@ -533,5 +569,14 @@ class WooShopCustomizerB{
 		</li>
 		
 		<?php
+	}
+	
+	
+	
+	/**
+	 * pre shop conditional add to cart button
+	 * */
+	static function preshop_woocommerce_after_shop_loop_item(){
+		woocommerce_get_template( 'loop/pre-shop-add-to-cart.php' );
 	}
 }

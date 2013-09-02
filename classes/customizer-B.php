@@ -334,12 +334,19 @@ class WooShopCustomizerB{
 					if($order_brands_dtc[$b_id]['price'] >= $min_order){
 						$condition_1 = true;
 					}
-				}
+				} 
+				//var_dump($codes); echo "<br/>";
+				//var_dump($max_delivery_distance); echo "<br/>";
 				
 				if(count($codes) >= (int) $max_delivery_distance){
 					$codes = array_slice($codes, 0, $max_delivery_distance);
 					$prices = array_slice($prices, 0, $max_delivery_distance);
-				
+					
+					//var_dump($codes); echo "<br/>";
+					//var_dump($prices); echo "<br/>";
+					//var_dump($max_delivery_distance); echo "<br/>";
+					
+					
 					if($prices[$max_delivery_distance -1] >= $min_order){
 						if(in_array($_SESSION['delivery']['delivery_code'], $codes)){
 							$condition_1 = true;
@@ -358,12 +365,14 @@ class WooShopCustomizerB{
 				
 				//condition2 now based on codes (latest update)
 				$used_codes = array_unique($details['codes']);
-				//var_dump($used_codes);
+				//var_dump($used_codes); echo "<br/>";
 				//var_dump($avg_delivery_speed);
 				//var_dump($max_delivery_crew);
 				
 				if(count($used_codes) >= (30 / $avg_delivery_speed * $max_delivery_crew)){
-					$condition_2 = false;
+					if(!in_array($_SESSION['delivery']['delivery_code'], $used_codes)){
+						$condition_2 = false;
+					}					
 				}
 		
 				//condition 3				
@@ -372,6 +381,11 @@ class WooShopCustomizerB{
 					$condition_3 = false;
 				}
 		
+				
+				//var_dump($condition_1); echo "<br/>";
+				//var_dump($condition_2); echo "<br/>";
+				//var_dump($condition_3); echo "<br/>";
+				//var_dump($auxiliary_1); echo "<br/>";
 				
 				
 				//latest lgoic
@@ -511,14 +525,14 @@ class WooShopCustomizerB{
 					$order_args['meta_query'][] = array(
 						'key' => self::delivery_date,
 						'value' => $_SESSION['delivery']['delivery_time'],
-						'compare' => 'LIKE'
+						'compare' => '='
 					);
 					break;
 				case 'time':
 					$order_args['meta_query'][] = array(
 						'key' => self::delivery_hour,
 						'value' => $_SESSION['delivery']['delivery_time_h'],
-						'compare' => 'LIKE'
+						'compare' => '='
 					);
 					break;
 				case 'code':
