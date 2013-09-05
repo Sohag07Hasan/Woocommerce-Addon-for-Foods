@@ -233,6 +233,7 @@ class WooShopCustomizerB{
 		$condition_2 = true;
 		$condition_3 = true;
 		$auxiliary_1 = false;
+		$auxiliary_2 = false;
 		
 		
 		$order_query_dtc = self::get_orders(array('date', 'time', 'code'));
@@ -342,9 +343,9 @@ class WooShopCustomizerB{
 					$codes = array_slice($codes, 0, $max_delivery_distance);
 					$prices = array_slice($prices, 0, $max_delivery_distance);
 					
-					//var_dump($codes); echo "<br/>";
-					//var_dump($prices); echo "<br/>";
-					//var_dump($max_delivery_distance); echo "<br/>";
+				//	var_dump($codes); echo "<br/>";
+				//	var_dump($prices); echo "<br/>";
+				//	var_dump($max_delivery_distance); echo "<br/>";
 					
 					
 					if($prices[$max_delivery_distance -1] >= $min_order){
@@ -352,6 +353,14 @@ class WooShopCustomizerB{
 							$condition_1 = true;
 							$auxiliary_1 = true;
 						}						
+					}
+					else{
+						if(in_array($_SESSION['delivery']['delivery_code'], $codes) && $delivery_codes[$_SESSION['delivery']['delivery_code']] >= $min_order){
+							$auxiliary_2 = false;
+						}
+						else{
+							$auxiliary_2 = true;
+						}
 					}							
 				}
 				
@@ -364,7 +373,8 @@ class WooShopCustomizerB{
 				*/
 				
 				//condition2 now based on codes (latest update)
-				$used_codes = array_unique($details['codes']);
+				//$used_codes = array_unique($details['codes']);
+				$used_codes = $codes;
 				//var_dump($used_codes); echo "<br/>";
 				//var_dump($avg_delivery_speed);
 				//var_dump($max_delivery_crew);
@@ -408,12 +418,25 @@ class WooShopCustomizerB{
 					}					
 				}
 				else{
+					
+					if($auxiliary_2){
+						self::$brand_details['unlock_it'][] = $b_id;
+					}
+					else{
+						self::$brand_details['others'][] = $b_id;
+					}
+					
+					//self::$brand_details['unlock_it'][] = $b_id;
+					
+					/*									
 					if($condition_2){
 						self::$brand_details['unlock_it'][] = $b_id;
 					}
 					else{
 						self::$brand_details['others'][] = $b_id;
 					}
+					* */
+					 
 				}
 				
 			}
